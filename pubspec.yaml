@@ -21,22 +21,22 @@ dev_dependencies:
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.3.10
 
-# 🔥 CONFIG DO FLUTTER (SÓ UM!)
+
 flutter:
   uses-material-design: true
 
   assets:
     - assets/logo.png
 
-# 🔥 ÍCONE DO APP
+
 flutter_icons:
   android: true
   ios: true
   image_path: "assets/logo.png"
 
-# 🔥 SPLASH NATIVA (PRIMEIRA TELA)
+
 flutter_native_splash:
-  color: "#2196F3" # mesma cor da sua splash
+  color: "#2196F3" 
   image: assets/logo.png
 
   android_12:
