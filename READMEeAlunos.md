@@ -17,6 +17,9 @@ For help getting started with Flutter development, view the
 samples, guidance on mobile development, and a full API reference.
 
 Hugo Palmiro Bento Francisco RA:24001655
+
 Gustavo Miranda RA:25000286
+
 Guilherme Silva Zavan Sampaio RA:25000183
+
 Paulo Bastos Nicioli de Albuquerque RA:25000780
