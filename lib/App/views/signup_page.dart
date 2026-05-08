@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../viewmodels/signup_viewmodel.dart';
 
 class SignupPage extends StatefulWidget {
@@ -29,41 +31,70 @@ class _SignupPageState extends State<SignupPage> {
     super.dispose();
   }
 
-  void _cadastrar() {
+  Future<void> _cadastrar() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _carregando = true);
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      final erro = _viewModel.cadastrar(
-        _nomeController.text,
-        _emailController.text,
-        _senhaController.text,
+    try {
+      final credential =
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _senhaController.text.trim(),
       );
+
+      await credential.user?.updateDisplayName(_nomeController.text.trim());
+
+      if (!mounted) return;
+
       setState(() => _carregando = false);
 
-      if (erro != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(erro),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Cadastro realizado com sucesso!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) Navigator.pop(context);
-        });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Cadastro realizado com sucesso!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() => _carregando = false);
+
+      String mensagem = 'Erro ao cadastrar usuário.';
+
+      if (e.code == 'email-already-in-use') {
+        mensagem = 'Este e-mail já está cadastrado.';
+      } else if (e.code == 'invalid-email') {
+        mensagem = 'E-mail inválido.';
+      } else if (e.code == 'weak-password') {
+        mensagem = 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+      } else if (e.code == 'operation-not-allowed') {
+        mensagem = 'Login por e-mail/senha não está ativado no Firebase.';
       }
-    });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensagem),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _carregando = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro inesperado: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -95,7 +126,6 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 const SizedBox(height: 32),
 
-                // Nome
                 TextFormField(
                   controller: _nomeController,
                   style: const TextStyle(color: Colors.white),
@@ -105,18 +135,15 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(color: Colors.white),
-                  decoration:
-                      _inputDecoration('E-mail', Icons.email_outlined),
+                  decoration: _inputDecoration('E-mail', Icons.email_outlined),
                   validator: _viewModel.validarEmail,
                 ),
                 const SizedBox(height: 16),
 
-                // Senha
                 TextFormField(
                   controller: _senhaController,
                   obscureText: !_senhaVisivel,
@@ -125,7 +152,9 @@ class _SignupPageState extends State<SignupPage> {
                       _inputDecoration('Senha', Icons.lock_outline).copyWith(
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _senhaVisivel ? Icons.visibility_off : Icons.visibility,
+                        _senhaVisivel
+                            ? Icons.visibility_off
+                            : Icons.visibility,
                         color: Colors.white38,
                       ),
                       onPressed: () =>
@@ -136,7 +165,6 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Confirmar senha
                 TextFormField(
                   controller: _confirmController,
                   obscureText: !_confirmVisivel,
@@ -157,11 +185,12 @@ class _SignupPageState extends State<SignupPage> {
                     ),
                   ),
                   validator: (v) => _viewModel.validarConfirmacaoSenha(
-                      v, _senhaController.text),
+                    v,
+                    _senhaController.text,
+                  ),
                 ),
                 const SizedBox(height: 32),
 
-                // Botão cadastrar
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -192,7 +221,6 @@ class _SignupPageState extends State<SignupPage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Voltar ao login
                 TextButton(
                   onPressed: () => Navigator.pop(context),
                   child: const Text(

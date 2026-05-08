@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../viewmodels/login_viewmodel.dart';
 import 'home_page.dart';
 import 'signup_page.dart';
@@ -26,35 +28,67 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  void _fazerLogin() {
+  Future<void> _fazerLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _carregando = true);
 
-    // Simula um pequeno delay para parecer mais real
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      final usuario = _viewModel.login(
-        _emailController.text,
-        _senhaController.text,
+    try {
+      final credential =
+          await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _senhaController.text.trim(),
       );
+
+      if (!mounted) return;
+
       setState(() => _carregando = false);
 
-      if (usuario != null) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => HomePage(usuario: usuario)),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('E-mail ou senha incorretos.'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => HomePage(usuario: credential.user),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() => _carregando = false);
+
+      String mensagem = 'E-mail ou senha incorretos.';
+
+      if (e.code == 'invalid-email') {
+        mensagem = 'E-mail inválido.';
+      } else if (e.code == 'user-not-found') {
+        mensagem = 'Usuário não encontrado.';
+      } else if (e.code == 'wrong-password') {
+        mensagem = 'Senha incorreta.';
+      } else if (e.code == 'invalid-credential') {
+        mensagem = 'E-mail ou senha incorretos.';
+      } else if (e.code == 'operation-not-allowed') {
+        mensagem = 'Login por e-mail/senha não está ativado no Firebase.';
       }
-    });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(mensagem),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() => _carregando = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erro inesperado: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -92,7 +126,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 40),
 
-                  // Campo e-mail
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -102,7 +135,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Campo senha
                   TextFormField(
                     controller: _senhaController,
                     obscureText: !_senhaVisivel,
@@ -126,7 +158,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 28),
 
-                  // Botão entrar
                   SizedBox(
                     width: double.infinity,
                     height: 52,
@@ -157,7 +188,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Link para cadastro
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -170,7 +200,8 @@ class _LoginPageState extends State<LoginPage> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (_) => const SignupPage()),
+                              builder: (_) => const SignupPage(),
+                            ),
                           );
                         },
                         child: const Text(
