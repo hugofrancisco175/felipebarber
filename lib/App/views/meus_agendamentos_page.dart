@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/agendamento_service.dart';
+import '../services/notificacao_service.dart';
 
 class MeusAgendamentosPage extends StatelessWidget {
   MeusAgendamentosPage({super.key});
@@ -50,6 +51,10 @@ class MeusAgendamentosPage extends StatelessWidget {
       );
       return;
     }
+
+    await NotificacaoService.cancelarNotificacoesAgendamento(agendamentoId);
+
+    if (!context.mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -102,6 +107,20 @@ class MeusAgendamentosPage extends StatelessWidget {
     );
   }
 
+  Future<void> _testarNotificacao(BuildContext context) async {
+    await NotificacaoService.mostrarNotificacaoTeste();
+
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Notificação de teste enviada.'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -114,6 +133,16 @@ class MeusAgendamentosPage extends StatelessWidget {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: 'Testar notificação',
+            icon: const Icon(
+              Icons.notifications_active_outlined,
+              color: Color(0xFFD4A853),
+            ),
+            onPressed: () => _testarNotificacao(context),
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: _service.buscarMeusAgendamentos(),
@@ -177,6 +206,14 @@ class MeusAgendamentosPage extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Lembretes: no dia às 08:00 e 30 minutos antes.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 13,
                       ),
                     ),
                     const SizedBox(height: 14),

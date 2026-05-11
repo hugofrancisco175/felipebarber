@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/agendamento_service.dart';
+import '../services/notificacao_service.dart';
 
 class AgendamentoPage extends StatefulWidget {
   final String servico;
@@ -90,6 +91,17 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       );
       return;
     }
+
+    final agendamentoId = _service.gerarIdAgendamento(data, horario);
+
+    await NotificacaoService.agendarNotificacoesAgendamento(
+      agendamentoId: agendamentoId,
+      servico: widget.servico,
+      data: data,
+      horario: horario,
+    );
+
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -255,7 +267,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                           ),
                         ),
                         const SizedBox(height: 24),
-
                         Text(
                           widget.servico,
                           style: const TextStyle(
@@ -265,7 +276,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-
                         const Text(
                           'Escolha o dia e o horário desejado',
                           textAlign: TextAlign.center,
@@ -275,7 +285,6 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                           ),
                         ),
                         const SizedBox(height: 32),
-
                         SizedBox(
                           width: double.infinity,
                           height: 52,
@@ -303,9 +312,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                             ),
                           ),
                         ),
-
                         const SizedBox(height: 28),
-
                         if (!diaAberto)
                           _mensagemBloqueio(
                             'A barbearia não atende em $nomeDia.',
@@ -326,9 +333,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                               ),
                             ),
                           ),
-
                           const SizedBox(height: 16),
-
                           if (horariosDisponiveis.isEmpty)
                             const Text(
                               'Nenhum horário disponível no momento.',
@@ -376,9 +381,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                               }).toList(),
                             ),
                         ],
-
                         const SizedBox(height: 28),
-
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(16),
@@ -390,7 +393,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                             ),
                           ),
                           child: const Text(
-                            'Os horários ocupados e datas bloqueadas ficam indisponíveis automaticamente.',
+                            'Os horários ocupados e datas bloqueadas ficam indisponíveis automaticamente. Você receberá lembretes no celular antes do horário.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white54,
