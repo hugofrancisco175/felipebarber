@@ -58,7 +58,7 @@ class MeusAgendamentosPage extends StatelessWidget {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Agendamento cancelado.'),
+        content: Text('Agendamento cancelado. O dono foi avisado no painel.'),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
       ),
@@ -121,6 +121,12 @@ class MeusAgendamentosPage extends StatelessWidget {
     );
   }
 
+  Color _corStatusPagamento(String status) {
+    if (status == 'Pago') return Colors.greenAccent;
+    if (status.contains('Aguardando')) return Colors.orangeAccent;
+    return Colors.white54;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -180,6 +186,9 @@ class MeusAgendamentosPage extends StatelessWidget {
               final servico = dados['servico'] ?? 'Serviço';
               final data = dados['data'] ?? '';
               final horario = dados['horario'] ?? '';
+              final valor = ((dados['valor'] ?? 0) as num).toDouble();
+              final formaPagamento = dados['formaPagamento'] ?? 'Não informado';
+              final statusPagamento = dados['statusPagamento'] ?? 'Pendente';
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -206,6 +215,24 @@ class MeusAgendamentosPage extends StatelessWidget {
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Valor: ${_service.formatarValor(valor)}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Pagamento: $formaPagamento',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Status: $statusPagamento',
+                      style: TextStyle(
+                        color: _corStatusPagamento(statusPagamento),
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),

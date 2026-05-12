@@ -31,6 +31,7 @@ flutter:
 
   assets:
     - assets/logo.png
+    - assets/status/
 
 
 flutter_icons:

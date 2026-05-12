@@ -1,11 +1,15 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../services/agendamento_service.dart';
+import '../services/status_service.dart';
 import 'agendamento_page.dart';
 import 'login_page.dart';
 import 'meus_agendamentos_page.dart';
 import 'painel_dono_page.dart';
+import 'postar_status_page.dart';
+import 'ver_status_page.dart';
 
 class HomePage extends StatelessWidget {
   final User? usuario;
@@ -55,19 +59,29 @@ class HomePage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 110,
-                height: 110,
+                width: 118,
+                height: 118,
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD4A853).withOpacity(0.15),
                   shape: BoxShape.circle,
                   border: Border.all(color: const Color(0xFFD4A853), width: 2),
                 ),
-                child: const Icon(
-                  Icons.home_outlined,
-                  size: 56,
-                  color: Color(0xFFD4A853),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/logo.png',
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) {
+                      return const Icon(
+                        Icons.content_cut,
+                        size: 56,
+                        color: Color(0xFFD4A853),
+                      );
+                    },
+                  ),
                 ),
               ),
+
               const SizedBox(height: 28),
 
               const Text(
@@ -86,7 +100,11 @@ class HomePage extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFFD4A853), fontSize: 18),
               ),
 
-              const SizedBox(height: 18),
+              const SizedBox(height: 30),
+
+              _statusBarbearia(context, ehDono),
+
+              const SizedBox(height: 30),
 
               const Text(
                 'Escolha um serviço para marcar seu horário',
@@ -94,7 +112,7 @@ class HomePage extends StatelessWidget {
                 style: TextStyle(color: Colors.white54, fontSize: 14),
               ),
 
-              const SizedBox(height: 42),
+              const SizedBox(height: 32),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -152,6 +170,202 @@ class HomePage extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _statusBarbearia(BuildContext context, bool ehDono) {
+    final StatusService statusService = StatusService();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Status da Barbearia',
+            style: TextStyle(
+              color: Color(0xFFD4A853),
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        SizedBox(
+          height: 112,
+          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: statusService.buscarStatusAtivos(),
+            builder: (context, snapshot) {
+              final docs = snapshot.data?.docs ?? [];
+
+              docs.sort((a, b) {
+                final criadoA = a.data()['criadoEm'];
+                final criadoB = b.data()['criadoEm'];
+
+                if (criadoA is Timestamp && criadoB is Timestamp) {
+                  return criadoB.compareTo(criadoA);
+                }
+
+                return 0;
+              });
+
+              if (!ehDono && docs.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2C2C2C),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF3C3C3C)),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Nenhum status publicado ainda.',
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  ),
+                );
+              }
+
+              return ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  if (ehDono) _botaoAdicionarStatus(context),
+                  ...docs.map((doc) {
+                    final dados = doc.data();
+
+                    final titulo = dados['titulo'] ?? 'Status';
+                    final legenda = dados['legenda'] ?? '';
+                    final imagemAsset =
+                        dados['imagemAsset'] ?? 'assets/logo.png';
+
+                    return _statusItem(
+                      context: context,
+                      statusId: doc.id,
+                      titulo: titulo,
+                      legenda: legenda,
+                      imagemAsset: imagemAsset,
+                      podeExcluir: ehDono,
+                    );
+                  }),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _botaoAdicionarStatus(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PostarStatusPage()),
+        );
+      },
+      child: Container(
+        width: 86,
+        margin: const EdgeInsets.only(right: 14),
+        child: Column(
+          children: [
+            Container(
+              width: 74,
+              height: 74,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF2C2C2C),
+                border: Border.all(
+                  color: const Color(0xFFD4A853),
+                  width: 2,
+                ),
+              ),
+              child: const Icon(
+                Icons.add,
+                color: Color(0xFFD4A853),
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Postar',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Color(0xFFD4A853), fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusItem({
+    required BuildContext context,
+    required String statusId,
+    required String titulo,
+    required String legenda,
+    required String imagemAsset,
+    required bool podeExcluir,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VerStatusPage(
+              statusId: statusId,
+              titulo: titulo,
+              legenda: legenda,
+              imagemAsset: imagemAsset,
+              podeExcluir: podeExcluir,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: 86,
+        margin: const EdgeInsets.only(right: 14),
+        child: Column(
+          children: [
+            Container(
+              width: 74,
+              height: 74,
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFFD4A853),
+                  width: 2,
+                ),
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  imagemAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) {
+                    return Container(
+                      color: const Color(0xFF2C2C2C),
+                      child: const Icon(
+                        Icons.image_not_supported_outlined,
+                        color: Colors.white54,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              titulo,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
         ),
       ),
     );

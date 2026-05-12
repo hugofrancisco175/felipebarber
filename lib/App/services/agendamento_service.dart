@@ -6,6 +6,8 @@ class AgendamentoService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   static const String emailDono = 'felipebarber@gmail.com';
+  static const int capacidadePorHorario = 3;
+  static const String chavePix = 'felipebarber@gmail.com';
 
   final List<String> horariosPadrao = const [
     '09:00',
@@ -49,9 +51,29 @@ class AgendamentoService {
     };
   }
 
-  String gerarIdAgendamento(String data, String horario) {
+  double valorServico(String servico) {
+    final s = servico.toLowerCase();
+
+    if (s.contains('barba')) return 20.0;
+    if (s.contains('combo')) return 60.0;
+    return 40.0;
+  }
+
+  String formatarValor(double valor) {
+    return 'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String gerarIdHorario(String data, String horario) {
     final horarioFormatado = horario.replaceAll(':', '-');
     return '${data}_$horarioFormatado';
+  }
+
+  String gerarIdAgendamento(String data, String horario) {
+    final usuario = _auth.currentUser;
+    final userId = usuario?.uid ?? 'sem_usuario';
+    final horarioFormatado = horario.replaceAll(':', '-');
+
+    return '${data}_${horarioFormatado}_$userId';
   }
 
   List<String> extrairHorarios(Map<String, dynamic>? dados) {
@@ -185,6 +207,13 @@ class AgendamentoService {
     return _firestore.collection('bloqueios_agenda').snapshots();
   }
 
+  Stream<QuerySnapshot<Map<String, dynamic>>> buscarNotificacoesDono() {
+    return _firestore
+        .collection('notificacoes_dono')
+        .orderBy('criadoEm', descending: true)
+        .snapshots();
+  }
+
   bool dataEstaBloqueadaPelosDados(
     String data,
     List<QueryDocumentSnapshot<Map<String, dynamic>>> bloqueios,
@@ -277,6 +306,7 @@ class AgendamentoService {
     required String servico,
     required String data,
     required String horario,
+    required String formaPagamento,
   }) async {
     final usuario = _auth.currentUser;
 
@@ -291,8 +321,21 @@ class AgendamentoService {
     }
 
     final idAgendamento = gerarIdAgendamento(data, horario);
+    final idHorario = gerarIdHorario(data, horario);
+
     final agendamentoRef =
         _firestore.collection('agendamentos').doc(idAgendamento);
+    final vagaRef = _firestore.collection('vagas_agenda').doc(idHorario);
+
+    final valor = valorServico(servico);
+
+    String statusPagamento = 'Pendente';
+
+    if (formaPagamento == 'Pix') {
+      statusPagamento = 'Aguardando confirmação';
+    } else {
+      statusPagamento = 'Pendente - pagar no local';
+    }
 
     try {
       await _firestore.runTransaction((transaction) async {
@@ -314,7 +357,18 @@ class AgendamentoService {
         final agendamentoSnapshot = await transaction.get(agendamentoRef);
 
         if (agendamentoSnapshot.exists) {
-          throw Exception('Este horário já foi ocupado.');
+          throw Exception('Você já possui agendamento neste horário.');
+        }
+
+        final vagaSnapshot = await transaction.get(vagaRef);
+        final vagaDados = vagaSnapshot.data();
+
+        final quantidadeAtual = vagaDados == null
+            ? 0
+            : ((vagaDados['quantidade'] ?? 0) as num).toInt();
+
+        if (quantidadeAtual >= capacidadePorHorario) {
+          throw Exception('Este horário já está lotado.');
         }
 
         transaction.set(agendamentoRef, {
@@ -324,14 +378,29 @@ class AgendamentoService {
           'servico': servico,
           'data': data,
           'horario': horario,
+          'valor': valor,
+          'formaPagamento': formaPagamento,
+          'statusPagamento': statusPagamento,
           'criadoEm': FieldValue.serverTimestamp(),
         });
+
+        transaction.set(vagaRef, {
+          'data': data,
+          'horario': horario,
+          'quantidade': quantidadeAtual + 1,
+          'capacidade': capacidadePorHorario,
+          'atualizadoEm': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       });
 
       return null;
     } catch (e) {
-      if (e.toString().contains('Este horário já foi ocupado')) {
-        return 'Este horário já foi ocupado.';
+      if (e.toString().contains('Este horário já está lotado')) {
+        return 'Este horário já está lotado.';
+      }
+
+      if (e.toString().contains('Você já possui agendamento')) {
+        return 'Você já possui agendamento neste horário.';
       }
 
       if (e.toString().contains('Este horário não está disponível')) {
@@ -347,11 +416,123 @@ class AgendamentoService {
   }
 
   Future<String?> cancelarAgendamento(String agendamentoId) async {
+    final usuario = _auth.currentUser;
+
+    if (usuario == null) {
+      return 'Usuário não autenticado.';
+    }
+
+    final agendamentoRef =
+        _firestore.collection('agendamentos').doc(agendamentoId);
+
+    final notificacaoRef = _firestore.collection('notificacoes_dono').doc();
+
     try {
-      await _firestore.collection('agendamentos').doc(agendamentoId).delete();
+      await _firestore.runTransaction((transaction) async {
+        final agendamentoSnapshot = await transaction.get(agendamentoRef);
+
+        if (!agendamentoSnapshot.exists) {
+          throw Exception('Agendamento não encontrado.');
+        }
+
+        final dados = agendamentoSnapshot.data()!;
+
+        final dono = usuarioEhDono(usuario);
+        final usuarioIdAgendamento = dados['usuarioId'] ?? '';
+
+        if (!dono && usuarioIdAgendamento != usuario.uid) {
+          throw Exception('Você não tem permissão para cancelar este agendamento.');
+        }
+
+        final data = dados['data'] ?? '';
+        final horario = dados['horario'] ?? '';
+        final idHorario = gerarIdHorario(data, horario);
+        final vagaRef = _firestore.collection('vagas_agenda').doc(idHorario);
+
+        final vagaSnapshot = await transaction.get(vagaRef);
+        final vagaDados = vagaSnapshot.data();
+
+        final quantidadeAtual = vagaDados == null
+            ? 0
+            : ((vagaDados['quantidade'] ?? 0) as num).toInt();
+
+        final novaQuantidade = quantidadeAtual > 0 ? quantidadeAtual - 1 : 0;
+
+        transaction.set(vagaRef, {
+          'data': data,
+          'horario': horario,
+          'quantidade': novaQuantidade,
+          'capacidade': capacidadePorHorario,
+          'atualizadoEm': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!dono) {
+          transaction.set(notificacaoRef, {
+            'tipo': 'cancelamento',
+            'titulo': 'Agendamento cancelado',
+            'mensagem':
+                '${dados['nomeCliente'] ?? 'Cliente'} cancelou ${dados['servico'] ?? 'serviço'} no dia $data às $horario.',
+            'nomeCliente': dados['nomeCliente'] ?? 'Cliente',
+            'emailCliente': dados['emailCliente'] ?? '',
+            'servico': dados['servico'] ?? '',
+            'data': data,
+            'horario': horario,
+            'lida': false,
+            'criadoEm': FieldValue.serverTimestamp(),
+          });
+        }
+
+        transaction.delete(agendamentoRef);
+      });
+
       return null;
     } catch (e) {
+      if (e.toString().contains('Agendamento não encontrado')) {
+        return 'Agendamento não encontrado.';
+      }
+
+      if (e.toString().contains('permissão')) {
+        return 'Você não tem permissão para cancelar este agendamento.';
+      }
+
       return 'Erro ao cancelar agendamento.';
+    }
+  }
+
+  Future<String?> confirmarPagamento(String agendamentoId) async {
+    final usuario = _auth.currentUser;
+
+    if (!usuarioEhDono(usuario)) {
+      return 'Apenas o dono pode confirmar pagamentos.';
+    }
+
+    try {
+      await _firestore.collection('agendamentos').doc(agendamentoId).update({
+        'statusPagamento': 'Pago',
+        'pagoEm': FieldValue.serverTimestamp(),
+      });
+
+      return null;
+    } catch (e) {
+      return 'Erro ao confirmar pagamento.';
+    }
+  }
+
+  Future<String?> marcarNotificacaoComoLida(String notificacaoId) async {
+    final usuario = _auth.currentUser;
+
+    if (!usuarioEhDono(usuario)) {
+      return 'Apenas o dono pode alterar notificações.';
+    }
+
+    try {
+      await _firestore.collection('notificacoes_dono').doc(notificacaoId).update({
+        'lida': true,
+      });
+
+      return null;
+    } catch (e) {
+      return 'Erro ao marcar notificação como lida.';
     }
   }
 }

@@ -68,6 +68,12 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
     return '${partes[2]}/${partes[1]}/${partes[0]}';
   }
 
+  Color _corStatusPagamento(String status) {
+    if (status == 'Pago') return Colors.greenAccent;
+    if (status.contains('Aguardando')) return Colors.orangeAccent;
+    return Colors.white54;
+  }
+
   Future<void> _selecionarDataInicio() async {
     final data = await showDatePicker(
       context: context,
@@ -242,6 +248,62 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
     );
   }
 
+  Future<void> _confirmarPagamento(
+    BuildContext context,
+    String agendamentoId,
+  ) async {
+    final erro = await _service.confirmarPagamento(agendamentoId);
+
+    if (!context.mounted) return;
+
+    if (erro != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(erro),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Pagamento confirmado com sucesso.'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _marcarNotificacaoComoLida(
+    BuildContext context,
+    String notificacaoId,
+  ) async {
+    final erro = await _service.marcarNotificacaoComoLida(notificacaoId);
+
+    if (!context.mounted) return;
+
+    if (erro != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(erro),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Notificação marcada como lida.'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _ordenarAgendamentos(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -258,6 +320,119 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
     return docs;
   }
 
+  Widget _cardNotificacoesDono() {
+    return _cardBase(
+      titulo: 'Notificações do dono',
+      subtitulo:
+          'Aqui aparecem avisos importantes, como cancelamentos feitos pelos clientes.',
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: _service.buscarNotificacoesDono(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: CircularProgressIndicator(
+                  color: Color(0xFFD4A853),
+                ),
+              ),
+            );
+          }
+
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Text(
+              'Nenhuma notificação no momento.',
+              style: TextStyle(color: Colors.white54),
+            );
+          }
+
+          final notificacoes = snapshot.data!.docs;
+
+          return Column(
+            children: notificacoes.map((doc) {
+              final dados = doc.data();
+
+              final titulo = dados['titulo'] ?? 'Notificação';
+              final mensagem = dados['mensagem'] ?? '';
+              final lida = dados['lida'] == true;
+
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: lida
+                        ? const Color(0xFF3C3C3C)
+                        : const Color(0xFFD4A853),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          lida
+                              ? Icons.notifications_none
+                              : Icons.notifications_active,
+                          color: lida
+                              ? Colors.white38
+                              : const Color(0xFFD4A853),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            titulo,
+                            style: TextStyle(
+                              color: lida
+                                  ? Colors.white70
+                                  : const Color(0xFFD4A853),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      mensagem,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (!lida) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              _marcarNotificacaoComoLida(context, doc.id),
+                          icon: const Icon(Icons.check),
+                          label: const Text('Marcar como lida'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFD4A853),
+                            side: const BorderSide(
+                              color: Color(0xFFD4A853),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            }).toList(),
+          );
+        },
+      ),
+    );
+  }
+
   Widget _cardHorarios() {
     return _cardBase(
       titulo: 'Horários disponíveis',
@@ -271,7 +446,10 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             return SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeColor: const Color(0xFFD4A853),
-              title: Text(horario, style: const TextStyle(color: Colors.white)),
+              title: Text(
+                horario,
+                style: const TextStyle(color: Colors.white),
+              ),
               subtitle: Text(
                 ativo ? 'Disponível' : 'Indisponível',
                 style: TextStyle(
@@ -315,7 +493,10 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             return SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeColor: const Color(0xFFD4A853),
-              title: Text(label, style: const TextStyle(color: Colors.white)),
+              title: Text(
+                label,
+                style: const TextStyle(color: Colors.white),
+              ),
               subtitle: Text(
                 ativo ? 'Aberto' : 'Fechado',
                 style: TextStyle(
@@ -502,6 +683,14 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             final servico = dados['servico'] ?? 'Serviço';
             final data = dados['data'] ?? '';
             final horario = dados['horario'] ?? '';
+            final formaPagamento = dados['formaPagamento'] ?? 'Não informado';
+            final statusPagamento = dados['statusPagamento'] ?? 'Pendente';
+
+            final valor = dados['valor'] is num
+                ? (dados['valor'] as num).toDouble()
+                : _service.valorServico(servico.toString());
+
+            final pagamentoPago = statusPagamento == 'Pago';
 
             return Container(
               width: double.infinity,
@@ -533,7 +722,42 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
                     'E-mail: $email',
                     style: const TextStyle(color: Colors.white54),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Valor: ${_service.formatarValor(valor)}',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Pagamento: $formaPagamento',
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Status: $statusPagamento',
+                    style: TextStyle(
+                      color: _corStatusPagamento(statusPagamento),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 12),
+                  if (!pagamentoPago)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _confirmarPagamento(context, doc.id),
+                        icon: const Icon(Icons.payments_outlined),
+                        label: const Text('Confirmar pagamento'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD4A853),
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (!pagamentoPago) const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
@@ -670,6 +894,7 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            _cardNotificacoesDono(),
             _cardHorarios(),
             _cardDiasFuncionamento(),
             _cardBloqueioPeriodo(),

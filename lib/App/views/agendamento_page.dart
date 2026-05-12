@@ -21,6 +21,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
 
   DateTime _dataSelecionada = DateTime.now();
   bool _carregando = false;
+  String _formaPagamento = 'Pagar no local';
 
   String _formatarData(DateTime data) {
     final ano = data.year.toString();
@@ -75,6 +76,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
       servico: widget.servico,
       data: data,
       horario: horario,
+      formaPagamento: _formaPagamento,
     );
 
     if (!mounted) return;
@@ -115,6 +117,8 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
   }
 
   void _mostrarConfirmacao(String horario) {
+    final valor = _service.valorServico(widget.servico);
+
     showDialog(
       context: context,
       builder: (_) {
@@ -125,7 +129,11 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
             style: TextStyle(color: Colors.white),
           ),
           content: Text(
-            'Deseja marcar ${widget.servico} no dia ${_formatarDataTela(_dataSelecionada)} às $horario?',
+            'Serviço: ${widget.servico}\n'
+            'Valor: ${_service.formatarValor(valor)}\n'
+            'Data: ${_formatarDataTela(_dataSelecionada)} às $horario\n'
+            'Pagamento: $_formaPagamento'
+            '${_formaPagamento == 'Pix' ? '\n\nChave Pix: ${AgendamentoService.chavePix}\nApós o pagamento, o dono confirmará no painel.' : ''}',
             style: const TextStyle(color: Colors.white70),
           ),
           actions: [
@@ -170,6 +178,96 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
           fontSize: 15,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  Widget _cardPagamento() {
+    final valor = _service.valorServico(widget.servico);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2C),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF3C3C3C)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Pagamento',
+            style: TextStyle(
+              color: Color(0xFFD4A853),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Valor: ${_service.formatarValor(valor)}',
+            style: const TextStyle(color: Colors.white, fontSize: 16),
+          ),
+          const SizedBox(height: 12),
+          RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            activeColor: const Color(0xFFD4A853),
+            title: const Text(
+              'Pagar no local',
+              style: TextStyle(color: Colors.white),
+            ),
+            subtitle: const Text(
+              'Pagamento feito na barbearia',
+              style: TextStyle(color: Colors.white54),
+            ),
+            value: 'Pagar no local',
+            groupValue: _formaPagamento,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _formaPagamento = value);
+              }
+            },
+          ),
+          RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            activeColor: const Color(0xFFD4A853),
+            title: const Text(
+              'Pix',
+              style: TextStyle(color: Colors.white),
+            ),
+            subtitle: const Text(
+              'O dono confirmará o pagamento no painel',
+              style: TextStyle(color: Colors.white54),
+            ),
+            value: 'Pix',
+            groupValue: _formaPagamento,
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _formaPagamento = value);
+              }
+            },
+          ),
+          if (_formaPagamento == 'Pix') ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A1A),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFD4A853)),
+              ),
+              child: const Text(
+                'Chave Pix: ${AgendamentoService.chavePix}',
+                style: TextStyle(
+                  color: Color(0xFFD4A853),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -232,12 +330,14 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
               return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _service.buscarAgendamentosPorData(dataFirebase),
                 builder: (context, snapshot) {
-                  final Set<String> horariosOcupados = {};
+                  final Map<String, int> quantidadePorHorario = {};
 
                   if (snapshot.hasData) {
                     for (final doc in snapshot.data!.docs) {
                       final dados = doc.data();
-                      horariosOcupados.add(dados['horario']);
+                      final horario = dados['horario'] ?? '';
+                      quantidadePorHorario[horario] =
+                          (quantidadePorHorario[horario] ?? 0) + 1;
                     }
                   }
 
@@ -277,7 +377,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Escolha o dia e o horário desejado',
+                          'Escolha o dia, o pagamento e o horário desejado',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white54,
@@ -312,6 +412,8 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 20),
+                        _cardPagamento(),
                         const SizedBox(height: 28),
                         if (!diaAberto)
                           _mensagemBloqueio(
@@ -345,23 +447,29 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                               spacing: 12,
                               runSpacing: 12,
                               children: horariosDisponiveis.map((horario) {
-                                final ocupado =
-                                    horariosOcupados.contains(horario);
+                                final quantidade =
+                                    quantidadePorHorario[horario] ?? 0;
+
+                                final vagasRestantes =
+                                    AgendamentoService.capacidadePorHorario -
+                                        quantidade;
+
+                                final lotado = vagasRestantes <= 0;
 
                                 return SizedBox(
-                                  width: 100,
-                                  height: 52,
+                                  width: 112,
+                                  height: 62,
                                   child: ElevatedButton(
-                                    onPressed: ocupado || _carregando
+                                    onPressed: lotado || _carregando
                                         ? null
                                         : () => _mostrarConfirmacao(horario),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: ocupado
+                                      backgroundColor: lotado
                                           ? const Color(0xFF3A3A3A)
                                           : const Color(0xFFD4A853),
                                       disabledBackgroundColor:
                                           const Color(0xFF3A3A3A),
-                                      foregroundColor: ocupado
+                                      foregroundColor: lotado
                                           ? Colors.white38
                                           : Colors.black,
                                       disabledForegroundColor: Colors.white38,
@@ -370,10 +478,13 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                                       ),
                                     ),
                                     child: Text(
-                                      ocupado ? 'Ocupado' : horario,
+                                      lotado
+                                          ? '$horario\nLotado'
+                                          : '$horario\n$vagasRestantes vagas',
                                       textAlign: TextAlign.center,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ),
@@ -393,7 +504,7 @@ class _AgendamentoPageState extends State<AgendamentoPage> {
                             ),
                           ),
                           child: const Text(
-                            'Os horários ocupados e datas bloqueadas ficam indisponíveis automaticamente. Você receberá lembretes no celular antes do horário.',
+                            'Cada horário aceita até 3 clientes, pois a barbearia possui 3 barbeiros disponíveis.',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Colors.white54,
