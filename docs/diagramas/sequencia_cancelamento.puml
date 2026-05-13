@@ -1,0 +1,31 @@
+@startuml
+actor Cliente
+participant "MeusAgendamentosPage" as TelaCliente
+participant "AgendamentoService" as Service
+participant "Firestore" as Firestore
+participant "NotificacaoService" as Notificacao
+actor "Dono da Barbearia" as Dono
+participant "PainelDonoPage" as Painel
+
+Cliente -> TelaCliente : Clica em cancelar agendamento
+TelaCliente -> Service : cancelarAgendamento(agendamentoId)
+
+Service -> Firestore : Buscar agendamento
+Firestore --> Service : Dados do agendamento
+
+Service -> Firestore : Atualizar vaga do horário\nquantidade - 1
+Service -> Firestore : Criar notificação para o dono
+Service -> Firestore : Excluir agendamento
+Firestore --> Service : Confirma alterações
+
+Service --> TelaCliente : Retorna sucesso
+TelaCliente -> Notificacao : Cancelar notificações locais
+Notificacao --> TelaCliente : Notificações canceladas
+TelaCliente --> Cliente : Mostra confirmação
+
+Dono -> Painel : Abre Painel do Dono
+Painel -> Firestore : Buscar notificações do dono
+Firestore --> Painel : Lista de notificações
+Painel --> Dono : Mostra aviso de cancelamento
+
+@enduml

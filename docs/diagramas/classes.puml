@@ -1,0 +1,112 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+class Usuario {
+  +uid: String
+  +nome: String
+  +email: String
+  +tipo: String
+}
+
+class Agendamento {
+  +id: String
+  +usuarioId: String
+  +nomeCliente: String
+  +emailCliente: String
+  +servico: String
+  +data: String
+  +horario: String
+  +valor: double
+  +formaPagamento: String
+  +statusPagamento: String
+  +criadoEm: Timestamp
+}
+
+class VagaAgenda {
+  +id: String
+  +data: String
+  +horario: String
+  +quantidade: int
+  +capacidade: int
+  +atualizadoEm: Timestamp
+}
+
+class ConfiguracaoAgenda {
+  +horariosDisponiveis: List<String>
+  +diasFuncionamento: Map<String, bool>
+  +atualizadoEm: Timestamp
+}
+
+class BloqueioAgenda {
+  +id: String
+  +motivo: String
+  +dataInicio: String
+  +dataFim: String
+  +criadoEm: Timestamp
+}
+
+class StatusBarbearia {
+  +id: String
+  +titulo: String
+  +legenda: String
+  +imagemAsset: String
+  +ativo: bool
+  +donoEmail: String
+  +criadoEm: Timestamp
+}
+
+class NotificacaoDono {
+  +id: String
+  +tipo: String
+  +titulo: String
+  +mensagem: String
+  +nomeCliente: String
+  +emailCliente: String
+  +servico: String
+  +data: String
+  +horario: String
+  +lida: bool
+  +criadoEm: Timestamp
+}
+
+class AgendamentoService {
+  +agendarHorario()
+  +cancelarAgendamento()
+  +confirmarPagamento()
+  +buscarMeusAgendamentos()
+  +buscarTodosAgendamentos()
+  +salvarHorariosDisponiveis()
+  +salvarDiasFuncionamento()
+  +adicionarBloqueioAgenda()
+  +excluirBloqueioAgenda()
+}
+
+class StatusService {
+  +buscarStatusAtivos()
+  +postarStatus()
+  +excluirStatus()
+}
+
+class NotificacaoService {
+  +inicializar()
+  +agendarNotificacoesAgendamento()
+  +cancelarNotificacoesAgendamento()
+  +mostrarNotificacaoTeste()
+}
+
+Usuario "1" -- "0..*" Agendamento
+Agendamento "*" -- "1" VagaAgenda
+ConfiguracaoAgenda "1" -- "0..*" BloqueioAgenda
+Usuario "1" -- "0..*" StatusBarbearia
+Usuario "1" -- "0..*" NotificacaoDono
+
+AgendamentoService ..> Agendamento
+AgendamentoService ..> VagaAgenda
+AgendamentoService ..> ConfiguracaoAgenda
+AgendamentoService ..> BloqueioAgenda
+AgendamentoService ..> NotificacaoDono
+
+StatusService ..> StatusBarbearia
+NotificacaoService ..> Agendamento
+
+@enduml

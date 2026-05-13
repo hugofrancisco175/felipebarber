@@ -1,0 +1,63 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Cliente
+actor "Dono da Barbearia" as Dono
+
+rectangle "Sistema Felipe Barber" {
+  usecase "Cadastrar conta" as UC01
+  usecase "Fazer login" as UC02
+  usecase "Visualizar status\nda barbearia" as UC03
+  usecase "Escolher serviço" as UC04
+  usecase "Escolher data e horário" as UC05
+  usecase "Escolher forma\nde pagamento" as UC06
+  usecase "Confirmar agendamento" as UC07
+  usecase "Consultar meus\nagendamentos" as UC08
+  usecase "Cancelar agendamento" as UC09
+  usecase "Receber lembretes\nde agendamento" as UC10
+
+  usecase "Acessar painel\ndo dono" as UC11
+  usecase "Visualizar todos\nos agendamentos" as UC12
+  usecase "Confirmar pagamento" as UC13
+  usecase "Configurar horários\ndisponíveis" as UC14
+  usecase "Configurar dias\nde funcionamento" as UC15
+  usecase "Bloquear período\nsem atendimento" as UC16
+  usecase "Publicar status\nda barbearia" as UC17
+  usecase "Excluir status" as UC18
+  usecase "Receber aviso de\ncancelamento" as UC19
+}
+
+Cliente --> UC01
+Cliente --> UC02
+Cliente --> UC03
+Cliente --> UC04
+Cliente --> UC05
+Cliente --> UC06
+Cliente --> UC07
+Cliente --> UC08
+Cliente --> UC09
+Cliente --> UC10
+
+Dono --> UC02
+Dono --> UC11
+Dono --> UC12
+Dono --> UC13
+Dono --> UC14
+Dono --> UC15
+Dono --> UC16
+Dono --> UC17
+Dono --> UC18
+Dono --> UC19
+
+UC07 ..> UC05 : <<include>>
+UC07 ..> UC06 : <<include>>
+UC07 ..> UC10 : <<include>>
+UC09 ..> UC19 : <<include>>
+UC11 ..> UC12 : <<include>>
+UC11 ..> UC13 : <<include>>
+UC11 ..> UC14 : <<include>>
+UC11 ..> UC15 : <<include>>
+UC11 ..> UC16 : <<include>>
+
+@enduml

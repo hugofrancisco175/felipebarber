@@ -1,0 +1,35 @@
+@startuml
+actor Cliente
+participant "AgendamentoPage" as Tela
+participant "AgendamentoService" as Service
+participant "Firestore" as Firestore
+participant "NotificacaoService" as Notificacao
+
+Cliente -> Tela : Escolhe serviço, data,\nhorário e pagamento
+Tela -> Service : agendarHorario(servico, data,\nhorario, formaPagamento)
+
+Service -> Firestore : Buscar configuração da agenda
+Firestore --> Service : Horários e dias de funcionamento
+
+Service -> Firestore : Verificar bloqueios da data
+Firestore --> Service : Bloqueios encontrados ou não
+
+Service -> Firestore : Consultar vaga do horário
+Firestore --> Service : Quantidade atual
+
+alt Horário lotado
+  Service --> Tela : Retorna erro\n"horário lotado"
+  Tela --> Cliente : Mostra mensagem de erro
+else Horário disponível
+  Service -> Firestore : Salvar agendamento
+  Service -> Firestore : Atualizar quantidade da vaga
+  Firestore --> Service : Confirma gravação
+  Service --> Tela : Retorna sucesso
+
+  Tela -> Notificacao : Agendar lembretes
+  Notificacao --> Tela : Notificações agendadas
+
+  Tela --> Cliente : Mostra confirmação
+end
+
+@enduml

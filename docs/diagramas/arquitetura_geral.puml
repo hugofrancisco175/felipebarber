@@ -1,0 +1,44 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+actor Cliente
+actor "Dono da Barbearia" as Dono
+
+rectangle "Aplicativo Felipe Barber\nFlutter" as App {
+  component "Login e Cadastro" as Login
+  component "Home" as Home
+  component "Agendamento" as Agendamento
+  component "Meus Agendamentos" as Meus
+  component "Painel do Dono" as Painel
+  component "Status da Barbearia" as Status
+  component "Notificações Locais" as Notificacoes
+}
+
+cloud "Firebase" {
+  database "Firebase Authentication" as Auth
+  database "Cloud Firestore" as Firestore
+}
+
+folder "Assets do App" as Assets {
+  component "Logo" as Logo
+  component "Imagens fixas\ndos status" as ImagensStatus
+}
+
+Cliente --> App : usa o aplicativo
+Dono --> App : administra o sistema
+
+Login --> Auth : autentica usuários
+
+Agendamento --> Firestore : salva agendamentos,\nvagas e pagamentos
+Meus --> Firestore : consulta e cancela\nagendamentos próprios
+Painel --> Firestore : gerencia agenda,\npagamentos e bloqueios
+Status --> Firestore : salva título,\nlegenda e imagem escolhida
+
+Status --> Assets : usa imagens fixas
+Home --> Assets : usa logo do app
+
+Agendamento --> Notificacoes : agenda lembretes
+Meus --> Notificacoes : cancela lembretes locais
+
+@enduml

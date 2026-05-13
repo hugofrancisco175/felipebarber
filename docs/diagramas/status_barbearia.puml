@@ -1,0 +1,37 @@
+@startuml
+actor "Dono da Barbearia" as Dono
+actor Cliente
+
+participant "HomePage" as Home
+participant "PostarStatusPage" as Postar
+participant "VerStatusPage" as Ver
+participant "StatusService" as Service
+participant "Firestore" as Firestore
+
+Dono -> Home : Acessa Home
+Home -> Service : Verifica se usuário é dono
+Service --> Home : Permite botão "Postar"
+
+Dono -> Home : Clica em Postar status
+Home -> Postar : Abre tela de postagem
+
+Dono -> Postar : Escolhe imagem fixa\ne escreve legenda
+Postar -> Service : postarStatus(titulo,\nlegenda, imagemAsset)
+
+Service -> Firestore : Salvar status_barbearia
+Firestore --> Service : Status salvo
+Service --> Postar : Retorna sucesso
+Postar --> Dono : Mostra confirmação
+
+Cliente -> Home : Acessa Home
+Home -> Service : buscarStatusAtivos()
+Service -> Firestore : Consultar status ativos
+Firestore --> Service : Lista de status
+Service --> Home : Retorna status
+Home --> Cliente : Mostra status em faixa horizontal
+
+Cliente -> Home : Clica em um status
+Home -> Ver : Abre status completo
+Ver --> Cliente : Mostra imagem e legenda
+
+@enduml

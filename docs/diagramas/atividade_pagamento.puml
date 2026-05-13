@@ -1,0 +1,33 @@
+@startuml
+start
+
+:Dono acessa o app;
+:Dono faz login;
+:Sistema verifica se o e-mail é\ndo dono da barbearia;
+
+if (Usuário é dono?) then (Sim)
+  :Sistema libera Painel do Dono;
+  :Dono visualiza todos os agendamentos;
+  :Dono seleciona um agendamento;
+
+  if (Status do pagamento é Pago?) then (Sim)
+    :Sistema mostra pagamento já confirmado;
+  else (Não)
+    :Dono confere se o pagamento foi recebido;
+
+    if (Pagamento recebido?) then (Sim)
+      :Dono clica em Confirmar pagamento;
+      :Sistema atualiza status para "Pago";
+      :Sistema salva data/hora da confirmação;
+      :Sistema mostra mensagem de sucesso;
+    else (Não)
+      :Pagamento continua pendente;
+    endif
+  endif
+
+else (Não)
+  :Sistema bloqueia acesso ao painel;
+endif
+
+stop
+@enduml

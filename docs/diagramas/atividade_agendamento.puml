@@ -1,0 +1,51 @@
+@startuml
+start
+
+:Cliente acessa o app;
+:Cliente faz login;
+:Cliente escolhe serviço\n(Corte, Barba ou Combo);
+
+:Sistema exibe valor do serviço;
+:Cliente escolhe data;
+
+if (Data está em dia de funcionamento?) then (Sim)
+  if (Data está bloqueada?) then (Não)
+    :Sistema busca horários disponíveis;
+    :Sistema consulta quantidade de clientes\nem cada horário;
+
+    if (Existe horário com vaga?) then (Sim)
+      :Cliente escolhe horário;
+      :Cliente escolhe forma de pagamento\n(Pix ou pagar no local);
+
+      if (Forma de pagamento é Pix?) then (Sim)
+        :Sistema mostra chave Pix;
+        :Status do pagamento fica\n"Aguardando confirmação";
+      else (Não)
+        :Status do pagamento fica\n"Pendente - pagar no local";
+      endif
+
+      :Cliente confirma agendamento;
+
+      if (Horário tem menos de 3 clientes?) then (Sim)
+        :Sistema salva agendamento no Firestore;
+        :Sistema atualiza quantidade de vagas;
+        :Sistema agenda notificações locais;
+        :Sistema mostra confirmação ao cliente;
+      else (Não)
+        :Sistema informa que o horário está lotado;
+      endif
+
+    else (Não)
+      :Sistema informa que não há horários disponíveis;
+    endif
+
+  else (Sim)
+    :Sistema informa que a barbearia\nnão atenderá nesta data;
+  endif
+
+else (Não)
+  :Sistema informa que a barbearia\nnão atende nesse dia da semana;
+endif
+
+stop
+@enduml
