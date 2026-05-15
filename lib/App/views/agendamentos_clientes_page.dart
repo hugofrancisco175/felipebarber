@@ -70,6 +70,18 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
     return Colors.white54;
   }
 
+  Color _corStatusAtendimento(String status) {
+    if (status == 'concluido') return Colors.greenAccent;
+    if (status == 'cancelado') return Colors.redAccent;
+    return const Color(0xFFD4A853);
+  }
+
+  String _textoStatusAtendimento(String status) {
+    if (status == 'concluido') return 'Atendimento concluído';
+    if (status == 'cancelado') return 'Cancelado';
+    return 'Atendimento ativo';
+  }
+
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _ordenar(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
@@ -86,11 +98,12 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
     return docs;
   }
 
-  Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> _agruparPorHora(
+  Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      _agruparPorHora(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
-    final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>> grupos =
-        {};
+    final Map<String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+        grupos = {};
 
     for (final doc in docs) {
       final horario = (doc.data()['horario'] ?? 'Sem horário').toString();
@@ -158,6 +171,34 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
     );
   }
 
+  Future<void> _concluirAtendimento(
+    BuildContext context,
+    String agendamentoId,
+  ) async {
+    final erro = await _service.concluirAtendimento(agendamentoId);
+
+    if (!context.mounted) return;
+
+    if (erro != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(erro),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Atendimento concluído com sucesso.'),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   void _confirmarCancelamento(
     BuildContext context,
     String agendamentoId,
@@ -201,52 +242,96 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
     );
   }
 
- Widget _cardResumo({
-  required String titulo,
-  required String valor,
-  required IconData icon,
-  required Color cor,
-}) {
-  return Expanded(
-    child: Container(
-      height: 104,
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF2C2C2C),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF3C3C3C)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: cor, size: 22),
-          const SizedBox(height: 6),
-          Text(
-            valor,
-            style: TextStyle(
-              color: cor,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+  void _confirmarConclusao(
+    BuildContext context,
+    String agendamentoId,
+    String nomeCliente,
+  ) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF2C2C2C),
+          title: const Text(
+            'Concluir atendimento',
+            style: TextStyle(color: Colors.white),
           ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: Text(
-              titulo,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white54,
-                fontSize: 10.5,
-                height: 1.1,
+          content: Text(
+            'Confirmar que o atendimento de $nomeCliente foi realizado?',
+            style: const TextStyle(color: Colors.white70),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Não',
+                style: TextStyle(color: Colors.white70),
               ),
             ),
-          ),
-        ],
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _concluirAtendimento(context, agendamentoId);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFD4A853),
+                foregroundColor: Colors.black,
+              ),
+              child: const Text('Sim, concluir'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _cardResumo({
+    required String titulo,
+    required String valor,
+    required IconData icon,
+    required Color cor,
+  }) {
+    return Expanded(
+      child: Container(
+        height: 104,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2C2C2C),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF3C3C3C)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: cor, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              valor,
+              style: TextStyle(
+                color: cor,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Text(
+                titulo,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 10.5,
+                  height: 1.1,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
+
   Widget _cabecalho() {
     return Container(
       width: double.infinity,
@@ -309,38 +394,62 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
   ) {
     int pagos = 0;
     int pendentes = 0;
+    int concluidos = 0;
 
     for (final doc in agendamentos) {
-      final status = (doc.data()['statusPagamento'] ?? '').toString();
+      final dados = doc.data();
 
-      if (status == 'Pago') {
+      final statusPagamento = (dados['statusPagamento'] ?? '').toString();
+      final statusAgendamento =
+          (dados['statusAgendamento'] ?? 'ativo').toString();
+
+      if (statusPagamento == 'Pago') {
         pagos++;
       } else {
         pendentes++;
       }
+
+      if (statusAgendamento == 'concluido') {
+        concluidos++;
+      }
     }
 
-    return Row(
+    return Column(
       children: [
-        _cardResumo(
-          titulo: 'Agendamentos',
-          valor: agendamentos.length.toString(),
-          icon: Icons.people_alt_outlined,
-          cor: const Color(0xFFD4A853),
+        Row(
+          children: [
+            _cardResumo(
+              titulo: 'Agendamentos',
+              valor: agendamentos.length.toString(),
+              icon: Icons.people_alt_outlined,
+              cor: const Color(0xFFD4A853),
+            ),
+            const SizedBox(width: 10),
+            _cardResumo(
+              titulo: 'Pagos',
+              valor: pagos.toString(),
+              icon: Icons.check_circle_outline,
+              cor: Colors.greenAccent,
+            ),
+          ],
         ),
-        const SizedBox(width: 10),
-        _cardResumo(
-          titulo: 'Pagos',
-          valor: pagos.toString(),
-          icon: Icons.check_circle_outline,
-          cor: Colors.greenAccent,
-        ),
-        const SizedBox(width: 10),
-        _cardResumo(
-          titulo: 'Pendentes',
-          valor: pendentes.toString(),
-          icon: Icons.pending_actions,
-          cor: Colors.orangeAccent,
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            _cardResumo(
+              titulo: 'Pendentes',
+              valor: pendentes.toString(),
+              icon: Icons.pending_actions,
+              cor: Colors.orangeAccent,
+            ),
+            const SizedBox(width: 10),
+            _cardResumo(
+              titulo: 'Concluídos',
+              valor: concluidos.toString(),
+              icon: Icons.done_all,
+              cor: Colors.lightBlueAccent,
+            ),
+          ],
         ),
       ],
     );
@@ -352,14 +461,19 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
     final nome = (dados['nomeCliente'] ?? 'Cliente').toString();
     final email = (dados['emailCliente'] ?? '').toString();
     final servico = (dados['servico'] ?? 'Serviço').toString();
-    final formaPagamento = (dados['formaPagamento'] ?? 'Não informado').toString();
+    final formaPagamento =
+        (dados['formaPagamento'] ?? 'Não informado').toString();
     final statusPagamento = (dados['statusPagamento'] ?? 'Pendente').toString();
+    final statusAgendamento =
+        (dados['statusAgendamento'] ?? 'ativo').toString();
 
     final valor = dados['valor'] is num
         ? (dados['valor'] as num).toDouble()
         : _service.valorServico(servico);
 
     final pago = statusPagamento == 'Pago';
+    final concluido = statusAgendamento == 'concluido';
+    final cancelado = statusAgendamento == 'cancelado';
 
     return Container(
       width: double.infinity,
@@ -369,7 +483,9 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
         color: const Color(0xFF1A1A1A),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: pago ? Colors.greenAccent.withOpacity(0.6) : const Color(0xFF3C3C3C),
+          color: concluido
+              ? Colors.greenAccent.withOpacity(0.65)
+              : const Color(0xFF3C3C3C),
         ),
       ),
       child: Column(
@@ -379,9 +495,10 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
             children: [
               CircleAvatar(
                 backgroundColor: const Color(0xFFD4A853).withOpacity(0.18),
-                child: const Icon(
-                  Icons.person_outline,
-                  color: Color(0xFFD4A853),
+                child: Icon(
+                  concluido ? Icons.done : Icons.person_outline,
+                  color:
+                      concluido ? Colors.greenAccent : const Color(0xFFD4A853),
                 ),
               ),
               const SizedBox(width: 12),
@@ -395,19 +512,53 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
                   ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: _corStatusPagamento(statusPagamento).withOpacity(0.12),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: _corStatusPagamento(statusPagamento).withOpacity(0.7),
+                    color:
+                        _corStatusPagamento(statusPagamento).withOpacity(0.7),
                   ),
                 ),
                 child: Text(
                   statusPagamento,
                   style: TextStyle(
                     color: _corStatusPagamento(statusPagamento),
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color:
+                      _corStatusAtendimento(statusAgendamento).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _corStatusAtendimento(statusAgendamento)
+                        .withOpacity(0.7),
+                  ),
+                ),
+                child: Text(
+                  _textoStatusAtendimento(statusAgendamento),
+                  style: TextStyle(
+                    color: _corStatusAtendimento(statusAgendamento),
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -434,44 +585,63 @@ class _AgendamentosClientesPageState extends State<AgendamentosClientesPage> {
             const SizedBox(height: 4),
             Text(
               'E-mail: $email',
-              style: const TextStyle(color: Colors.white38, fontSize: 12),
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 12,
+              ),
             ),
           ],
           const SizedBox(height: 14),
-          Row(
-            children: [
-              if (!pago)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _confirmarPagamento(context, doc.id),
-                    icon: const Icon(Icons.payments_outlined, size: 18),
-                    label: const Text('Pago'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD4A853),
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              if (!pago) const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _confirmarCancelamento(context, doc.id, nome),
-                  icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Cancelar'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+          if (!cancelado && !pago)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _confirmarPagamento(context, doc.id),
+                icon: const Icon(Icons.payments_outlined, size: 18),
+                label: const Text('Confirmar pagamento'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD4A853),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          if (!cancelado && !pago) const SizedBox(height: 10),
+          if (!cancelado && !concluido)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmarConclusao(context, doc.id, nome),
+                icon: const Icon(Icons.done_all, size: 18),
+                label: const Text('Concluir atendimento'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.greenAccent,
+                  side: const BorderSide(color: Colors.greenAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          if (!cancelado && !concluido) const SizedBox(height: 10),
+          if (!cancelado && !concluido)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmarCancelamento(context, doc.id, nome),
+                icon: const Icon(Icons.close, size: 18),
+                label: const Text('Cancelar agendamento'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.redAccent,
+                  side: const BorderSide(color: Colors.redAccent),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

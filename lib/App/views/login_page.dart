@@ -34,8 +34,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _carregando = true);
 
     try {
-      final credential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _senhaController.text.trim(),
       );
@@ -46,9 +45,7 @@ class _LoginPageState extends State<LoginPage> {
 
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-          builder: (_) => HomePage(usuario: credential.user),
-        ),
+        MaterialPageRoute(builder: (_) => HomePage(usuario: credential.user)),
       );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -104,10 +101,31 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.content_cut,
-                    size: 64,
-                    color: Color(0xFFD4A853),
+                  Container(
+                    width: 120,
+                    height: 120,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD4A853).withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFD4A853),
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/logo.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) {
+                          return const Icon(
+                            Icons.content_cut,
+                            size: 56,
+                            color: Color(0xFFD4A853),
+                          );
+                        },
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -130,7 +148,10 @@ class _LoginPageState extends State<LoginPage> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     style: const TextStyle(color: Colors.white),
-                    decoration: _inputDecoration('E-mail', Icons.email_outlined),
+                    decoration: _inputDecoration(
+                      'E-mail',
+                      Icons.email_outlined,
+                    ),
                     validator: _viewModel.validarEmail,
                   ),
                   const SizedBox(height: 16),
@@ -139,21 +160,19 @@ class _LoginPageState extends State<LoginPage> {
                     controller: _senhaController,
                     obscureText: !_senhaVisivel,
                     style: const TextStyle(color: Colors.white),
-                    decoration: _inputDecoration(
-                      'Senha',
-                      Icons.lock_outline,
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _senhaVisivel
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                          color: Colors.white38,
+                    decoration: _inputDecoration('Senha', Icons.lock_outline)
+                        .copyWith(
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _senhaVisivel
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: Colors.white38,
+                            ),
+                            onPressed: () =>
+                                setState(() => _senhaVisivel = !_senhaVisivel),
+                          ),
                         ),
-                        onPressed: () =>
-                            setState(() => _senhaVisivel = !_senhaVisivel),
-                      ),
-                    ),
                     validator: _viewModel.validarSenha,
                   ),
                   const SizedBox(height: 28),

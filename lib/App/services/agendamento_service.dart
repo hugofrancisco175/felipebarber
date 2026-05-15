@@ -183,6 +183,7 @@ class AgendamentoService {
     return _firestore
         .collection('agendamentos')
         .where('data', isEqualTo: data)
+        .where('statusAgendamento', whereIn: ['ativo', 'concluido'])
         .snapshots();
   }
 
@@ -196,6 +197,7 @@ class AgendamentoService {
     return _firestore
         .collection('agendamentos')
         .where('usuarioId', isEqualTo: usuario.uid)
+        .where('statusAgendamento', isEqualTo: 'ativo')
         .snapshots();
   }
 
@@ -323,8 +325,9 @@ class AgendamentoService {
     final idAgendamento = gerarIdAgendamento(data, horario);
     final idHorario = gerarIdHorario(data, horario);
 
-    final agendamentoRef =
-        _firestore.collection('agendamentos').doc(idAgendamento);
+    final agendamentoRef = _firestore
+        .collection('agendamentos')
+        .doc(idAgendamento);
     final vagaRef = _firestore.collection('vagas_agenda').doc(idHorario);
 
     final valor = valorServico(servico);
@@ -381,6 +384,7 @@ class AgendamentoService {
           'valor': valor,
           'formaPagamento': formaPagamento,
           'statusPagamento': statusPagamento,
+          'statusAgendamento': 'ativo',
           'criadoEm': FieldValue.serverTimestamp(),
         });
 
@@ -422,8 +426,9 @@ class AgendamentoService {
       return 'Usuário não autenticado.';
     }
 
-    final agendamentoRef =
-        _firestore.collection('agendamentos').doc(agendamentoId);
+    final agendamentoRef = _firestore
+        .collection('agendamentos')
+        .doc(agendamentoId);
 
     final notificacaoRef = _firestore.collection('notificacoes_dono').doc();
 
@@ -441,7 +446,20 @@ class AgendamentoService {
         final usuarioIdAgendamento = dados['usuarioId'] ?? '';
 
         if (!dono && usuarioIdAgendamento != usuario.uid) {
-          throw Exception('Você não tem permissão para cancelar este agendamento.');
+          throw Exception(
+            'Você não tem permissão para cancelar este agendamento.',
+          );
+        }
+
+        final statusAgendamento = (dados['statusAgendamento'] ?? 'ativo')
+            .toString();
+
+        if (statusAgendamento == 'cancelado') {
+          throw Exception('Este agendamento já foi cancelado.');
+        }
+
+        if (statusAgendamento == 'concluido') {
+          throw Exception('Este atendimento já foi concluído.');
         }
 
         final data = dados['data'] ?? '';
@@ -466,6 +484,12 @@ class AgendamentoService {
           'atualizadoEm': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
+        transaction.update(agendamentoRef, {
+          'statusAgendamento': 'cancelado',
+          'canceladoEm': FieldValue.serverTimestamp(),
+          'canceladoPor': dono ? 'dono' : 'cliente',
+        });
+
         if (!dono) {
           transaction.set(notificacaoRef, {
             'tipo': 'cancelamento',
@@ -481,8 +505,6 @@ class AgendamentoService {
             'criadoEm': FieldValue.serverTimestamp(),
           });
         }
-
-        transaction.delete(agendamentoRef);
       });
 
       return null;
@@ -493,6 +515,14 @@ class AgendamentoService {
 
       if (e.toString().contains('permissão')) {
         return 'Você não tem permissão para cancelar este agendamento.';
+      }
+
+      if (e.toString().contains('já foi cancelado')) {
+        return 'Este agendamento já foi cancelado.';
+      }
+
+      if (e.toString().contains('já foi concluído')) {
+        return 'Este atendimento já foi concluído.';
       }
 
       return 'Erro ao cancelar agendamento.';
@@ -506,8 +536,26 @@ class AgendamentoService {
       return 'Apenas o dono pode confirmar pagamentos.';
     }
 
+    final agendamentoRef = _firestore
+        .collection('agendamentos')
+        .doc(agendamentoId);
+
     try {
-      await _firestore.collection('agendamentos').doc(agendamentoId).update({
+      final snapshot = await agendamentoRef.get();
+
+      if (!snapshot.exists) {
+        return 'Agendamento não encontrado.';
+      }
+
+      final dados = snapshot.data();
+      final statusAgendamento = (dados?['statusAgendamento'] ?? 'ativo')
+          .toString();
+
+      if (statusAgendamento == 'cancelado') {
+        return 'Não é possível confirmar pagamento de um agendamento cancelado.';
+      }
+
+      await agendamentoRef.update({
         'statusPagamento': 'Pago',
         'pagoEm': FieldValue.serverTimestamp(),
       });
@@ -526,13 +574,65 @@ class AgendamentoService {
     }
 
     try {
-      await _firestore.collection('notificacoes_dono').doc(notificacaoId).update({
-        'lida': true,
-      });
+      await _firestore
+          .collection('notificacoes_dono')
+          .doc(notificacaoId)
+          .update({'lida': true});
 
       return null;
     } catch (e) {
       return 'Erro ao marcar notificação como lida.';
+    }
+  }
+
+  Future<String?> concluirAtendimento(String agendamentoId) async {
+    final usuario = _auth.currentUser;
+
+    if (!usuarioEhDono(usuario)) {
+      return 'Apenas o dono pode concluir atendimentos.';
+    }
+
+    final agendamentoRef = _firestore
+        .collection('agendamentos')
+        .doc(agendamentoId);
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final snapshot = await transaction.get(agendamentoRef);
+
+        if (!snapshot.exists) {
+          throw Exception('Agendamento não encontrado.');
+        }
+
+        final dados = snapshot.data()!;
+        final statusAgendamento = (dados['statusAgendamento'] ?? 'ativo')
+            .toString();
+
+        if (statusAgendamento == 'cancelado') {
+          throw Exception('Não é possível concluir um agendamento cancelado.');
+        }
+
+        if (statusAgendamento == 'concluido') {
+          throw Exception('Este atendimento já foi concluído.');
+        }
+
+        transaction.update(agendamentoRef, {
+          'statusAgendamento': 'concluido',
+          'concluidoEm': FieldValue.serverTimestamp(),
+        });
+      });
+
+      return null;
+    } catch (e) {
+      if (e.toString().contains('cancelado')) {
+        return 'Não é possível concluir um agendamento cancelado.';
+      }
+
+      if (e.toString().contains('já foi concluído')) {
+        return 'Este atendimento já foi concluído.';
+      }
+
+      return 'Erro ao concluir atendimento.';
     }
   }
 }
