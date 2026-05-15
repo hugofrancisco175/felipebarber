@@ -1,5 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../viewmodels/splash_viewmodel.dart';
+
+import 'home_page.dart';
 import 'login_page.dart';
 
 class SplashPage extends StatefulWidget {
@@ -11,7 +13,6 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
-  final SplashViewModel _viewModel = SplashViewModel();
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -23,19 +24,72 @@ class _SplashPageState extends State<SplashPage>
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+
     _controller.forward();
 
-    _viewModel.iniciarNavegacao(context, const LoginPage());
+    _navegarDepoisDaSplash();
+  }
+
+  Future<void> _navegarDepoisDaSplash() async {
+    await Future.delayed(const Duration(seconds: 2));
+
+    if (!mounted) return;
+
+    final usuario = FirebaseAuth.instance.currentUser;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) {
+          if (usuario != null) {
+            return HomePage(usuario: usuario);
+          }
+
+          return const LoginPage();
+        },
+      ),
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Widget _logo() {
+    return Container(
+      width: 160,
+      height: 160,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFD4A853).withOpacity(0.14),
+        shape: BoxShape.circle,
+        border: Border.all(color: const Color(0xFFD4A853), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD4A853).withOpacity(0.28),
+            blurRadius: 32,
+            spreadRadius: 4,
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: Image.asset(
+          'assets/logo.png',
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) {
+            return const Icon(
+              Icons.content_cut,
+              size: 62,
+              color: Color(0xFFD4A853),
+            );
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -48,46 +102,27 @@ class _SplashPageState extends State<SplashPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD4A853),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFD4A853).withOpacity(0.4),
-                      blurRadius: 30,
-                      spreadRadius: 5,
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.content_cut,
-                  size: 60,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 24),
+              _logo(),
+              const SizedBox(height: 26),
               const Text(
-                'Barbearia',
+                'Felipe Barber',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 36,
+                  fontSize: 34,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
+                  letterSpacing: 1.6,
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Estilo & Tradição',
+                'Agendamento • Estilo • Barbearia',
                 style: TextStyle(
                   color: Color(0xFFD4A853),
-                  fontSize: 16,
-                  letterSpacing: 1.5,
+                  fontSize: 14,
+                  letterSpacing: 1.1,
                 ),
               ),
-              const SizedBox(height: 60),
+              const SizedBox(height: 58),
               const SizedBox(
                 width: 30,
                 height: 30,

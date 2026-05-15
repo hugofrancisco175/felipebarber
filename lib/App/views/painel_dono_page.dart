@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'relatorio_gerencial_page.dart';
 import '../services/agendamento_service.dart';
+import 'agendamentos_clientes_page.dart';
 
 class PainelDonoPage extends StatefulWidget {
   const PainelDonoPage({super.key});
@@ -862,6 +863,109 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
     );
   }
 
+  Widget _botaoAbrirAgendaClientes(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AgendamentosClientesPage()),
+          );
+        },
+        icon: const Icon(Icons.event_available_outlined),
+        label: const Text('Agenda dos clientes'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFD4A853),
+          foregroundColor: Colors.black,
+          textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _cabecalhoPainel() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2C),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF3C3C3C)),
+      ),
+      child: const Column(
+        children: [
+          Icon(
+            Icons.admin_panel_settings_outlined,
+            color: Color(0xFFD4A853),
+            size: 46,
+          ),
+          SizedBox(height: 10),
+          Text(
+            'Área administrativa',
+            style: TextStyle(
+              color: Color(0xFFD4A853),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Gerencie agenda, pagamentos, horários, bloqueios e relatórios da barbearia.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.35),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _secaoExpansivel({
+    required String titulo,
+    required String subtitulo,
+    required IconData icon,
+    required Widget child,
+    bool inicialmenteAberta = false,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2C),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF3C3C3C)),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: inicialmenteAberta,
+          iconColor: const Color(0xFFD4A853),
+          collapsedIconColor: const Color(0xFFD4A853),
+          leading: Icon(icon, color: const Color(0xFFD4A853)),
+          title: Text(
+            titulo,
+            style: const TextStyle(
+              color: Color(0xFFD4A853),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          subtitle: Text(
+            subtitulo,
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          children: [child],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = FirebaseAuth.instance.currentUser;
@@ -908,25 +1012,44 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            _cabecalhoPainel(),
+
+            _botaoAbrirAgendaClientes(context),
+
+            const SizedBox(height: 12),
+
             _botaoAbrirRelatorioGerencial(context),
+
             const SizedBox(height: 22),
-            _cardNotificacoesDono(),
-            _cardHorarios(),
-            _cardDiasFuncionamento(),
-            _cardBloqueioPeriodo(),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Todos os agendamentos',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 21,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+
+            _secaoExpansivel(
+              titulo: 'Notificações',
+              subtitulo: 'Avisos de cancelamentos feitos pelos clientes.',
+              icon: Icons.notifications_active_outlined,
+              inicialmenteAberta: true,
+              child: _cardNotificacoesDono(),
             ),
-            const SizedBox(height: 14),
-            _listaAgendamentos(),
+
+            _secaoExpansivel(
+              titulo: 'Horários disponíveis',
+              subtitulo: 'Ative ou desative horários da agenda.',
+              icon: Icons.schedule,
+              child: _cardHorarios(),
+            ),
+
+            _secaoExpansivel(
+              titulo: 'Dias de funcionamento',
+              subtitulo: 'Defina os dias em que a barbearia atende.',
+              icon: Icons.calendar_month_outlined,
+              child: _cardDiasFuncionamento(),
+            ),
+
+            _secaoExpansivel(
+              titulo: 'Bloquear período',
+              subtitulo: 'Use para viagem, folga, férias ou reforma.',
+              icon: Icons.block,
+              child: _cardBloqueioPeriodo(),
+            ),
           ],
         ),
       ),

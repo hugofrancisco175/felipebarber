@@ -60,9 +60,9 @@ class HomePage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Container(
-                width: 118,
-                height: 118,
-                padding: const EdgeInsets.all(12),
+                width: 128,
+                height: 128,
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD4A853).withOpacity(0.15),
                   shape: BoxShape.circle,
