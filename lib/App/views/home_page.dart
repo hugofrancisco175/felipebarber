@@ -10,6 +10,7 @@ import 'meus_agendamentos_page.dart';
 import 'painel_dono_page.dart';
 import 'postar_status_page.dart';
 import 'ver_status_page.dart';
+import 'consultor_ia_page.dart';
 
 class HomePage extends StatelessWidget {
   final User? usuario;
@@ -106,6 +107,20 @@ class HomePage extends StatelessWidget {
 
               const SizedBox(height: 30),
 
+              _botaoGrande(
+                context: context,
+                icon: Icons.auto_awesome,
+                texto: 'Consultor de Corte com IA',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ConsultorIaPage()),
+                  );
+                },
+              ),
+
+              const SizedBox(height: 30),
+
               const Text(
                 'Escolha um serviço para marcar seu horário',
                 textAlign: TextAlign.center,
@@ -151,23 +166,6 @@ class HomePage extends StatelessWidget {
                   },
                 ),
               ],
-
-              const SizedBox(height: 22),
-
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2C2C2C),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF3C3C3C)),
-                ),
-                child: const Text(
-                  'Após escolher um serviço, você poderá selecionar uma data e um horário disponível.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, fontSize: 13),
-                ),
-              ),
             ],
           ),
         ),
@@ -279,16 +277,9 @@ class HomePage extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFF2C2C2C),
-                border: Border.all(
-                  color: const Color(0xFFD4A853),
-                  width: 2,
-                ),
+                border: Border.all(color: const Color(0xFFD4A853), width: 2),
               ),
-              child: const Icon(
-                Icons.add,
-                color: Color(0xFFD4A853),
-                size: 36,
-              ),
+              child: const Icon(Icons.add, color: Color(0xFFD4A853), size: 36),
             ),
             const SizedBox(height: 8),
             const Text(
@@ -336,10 +327,7 @@ class HomePage extends StatelessWidget {
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFD4A853),
-                  width: 2,
-                ),
+                border: Border.all(color: const Color(0xFFD4A853), width: 2),
               ),
               child: ClipOval(
                 child: Image.asset(

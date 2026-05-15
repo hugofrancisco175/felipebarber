@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import 'relatorio_gerencial_page.dart';
 import '../services/agendamento_service.dart';
 
 class PainelDonoPage extends StatefulWidget {
@@ -25,6 +25,30 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
 
   DateTime? _dataInicioBloqueio;
   DateTime? _dataFimBloqueio;
+
+  Widget _botaoAbrirRelatorioGerencial(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const RelatorioGerencialPage()),
+          );
+        },
+        icon: const Icon(Icons.analytics_outlined),
+        label: const Text('Relatório gerencial'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFD4A853),
+          foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -332,9 +356,7 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(12),
-                child: CircularProgressIndicator(
-                  color: Color(0xFFD4A853),
-                ),
+                child: CircularProgressIndicator(color: Color(0xFFD4A853)),
               ),
             );
           }
@@ -416,9 +438,7 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
                           label: const Text('Marcar como lida'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: const Color(0xFFD4A853),
-                            side: const BorderSide(
-                              color: Color(0xFFD4A853),
-                            ),
+                            side: const BorderSide(color: Color(0xFFD4A853)),
                           ),
                         ),
                       ),
@@ -446,10 +466,7 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             return SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeColor: const Color(0xFFD4A853),
-              title: Text(
-                horario,
-                style: const TextStyle(color: Colors.white),
-              ),
+              title: Text(horario, style: const TextStyle(color: Colors.white)),
               subtitle: Text(
                 ativo ? 'Disponível' : 'Indisponível',
                 style: TextStyle(
@@ -493,10 +510,7 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
             return SwitchListTile(
               contentPadding: EdgeInsets.zero,
               activeColor: const Color(0xFFD4A853),
-              title: Text(
-                label,
-                style: const TextStyle(color: Colors.white),
-              ),
+              title: Text(label, style: const TextStyle(color: Colors.white)),
               subtitle: Text(
                 ativo ? 'Aberto' : 'Fechado',
                 style: TextStyle(
@@ -894,6 +908,8 @@ class _PainelDonoPageState extends State<PainelDonoPage> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
+            _botaoAbrirRelatorioGerencial(context),
+            const SizedBox(height: 22),
             _cardNotificacoesDono(),
             _cardHorarios(),
             _cardDiasFuncionamento(),
