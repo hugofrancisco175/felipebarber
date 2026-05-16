@@ -5,6 +5,13 @@ import 'package:flutter/material.dart';
 import '../services/agendamento_service.dart';
 import '../services/gemini_service.dart';
 
+enum PeriodoRelatorio {
+  hoje,
+  semana,
+  mes,
+  todos,
+}
+
 class RelatorioGerencialPage extends StatefulWidget {
   const RelatorioGerencialPage({super.key});
 
@@ -22,6 +29,8 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
   bool _gerandoIa = false;
   String? _analiseIa;
 
+  PeriodoRelatorio _periodoSelecionado = PeriodoRelatorio.mes;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +39,91 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
 
   String _formatarDinheiro(double valor) {
     return 'R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}';
+  }
+
+  String _formatarDataFirebase(DateTime data) {
+    final ano = data.year.toString();
+    final mes = data.month.toString().padLeft(2, '0');
+    final dia = data.day.toString().padLeft(2, '0');
+
+    return '$ano-$mes-$dia';
+  }
+
+  String _nomePeriodo(PeriodoRelatorio periodo) {
+    switch (periodo) {
+      case PeriodoRelatorio.hoje:
+        return 'Hoje';
+      case PeriodoRelatorio.semana:
+        return 'Semana';
+      case PeriodoRelatorio.mes:
+        return 'Mês';
+      case PeriodoRelatorio.todos:
+        return 'Todos';
+    }
+  }
+
+  String _descricaoPeriodo() {
+    final hoje = DateTime.now();
+
+    if (_periodoSelecionado == PeriodoRelatorio.hoje) {
+      return 'Dados do dia ${_formatarDataFirebase(hoje)}';
+    }
+
+    if (_periodoSelecionado == PeriodoRelatorio.semana) {
+      final inicio = _inicioDaSemana(hoje);
+      final fim = inicio.add(const Duration(days: 6));
+
+      return 'Dados da semana: ${_formatarDataFirebase(inicio)} até ${_formatarDataFirebase(fim)}';
+    }
+
+    if (_periodoSelecionado == PeriodoRelatorio.mes) {
+      final mes = hoje.month.toString().padLeft(2, '0');
+      final ano = hoje.year.toString();
+
+      return 'Dados do mês $mes/$ano';
+    }
+
+    return 'Todos os dados registrados no sistema';
+  }
+
+  DateTime _inicioDaSemana(DateTime data) {
+    final diaLimpo = DateTime(data.year, data.month, data.day);
+
+    return diaLimpo.subtract(Duration(days: diaLimpo.weekday - 1));
+  }
+
+  bool _dataDentroDoPeriodo(String dataTexto) {
+    if (_periodoSelecionado == PeriodoRelatorio.todos) {
+      return true;
+    }
+
+    try {
+      final data = DateTime.parse(dataTexto);
+      final dataLimpa = DateTime(data.year, data.month, data.day);
+
+      final hoje = DateTime.now();
+      final hojeLimpo = DateTime(hoje.year, hoje.month, hoje.day);
+
+      if (_periodoSelecionado == PeriodoRelatorio.hoje) {
+        return dataLimpa == hojeLimpo;
+      }
+
+      if (_periodoSelecionado == PeriodoRelatorio.semana) {
+        final inicio = _inicioDaSemana(hojeLimpo);
+        final fim = inicio.add(const Duration(days: 6));
+
+        return !dataLimpa.isBefore(inicio) && !dataLimpa.isAfter(fim);
+      }
+
+      if (_periodoSelecionado == PeriodoRelatorio.mes) {
+        return dataLimpa.year == hojeLimpo.year &&
+            dataLimpa.month == hojeLimpo.month;
+      }
+
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
   bool _pagamentoConfirmado(String status) {
@@ -46,12 +140,17 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
         !_pagamentoConfirmado(status);
   }
 
+  void _trocarPeriodo(PeriodoRelatorio periodo) {
+    setState(() {
+      _periodoSelecionado = periodo;
+      _analiseIa = null;
+      _futureResumo = _carregarResumoGerencial();
+    });
+  }
+
   Future<Map<String, dynamic>> _carregarResumoGerencial() async {
     final agendamentosSnapshot =
         await _firestore.collection('agendamentos').get();
-
-    final notificacoesSnapshot =
-        await _firestore.collection('notificacoes_dono').get();
 
     double totalPrevisto = 0;
     double totalRecebido = 0;
@@ -60,19 +159,29 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
     double totalLocalPendente = 0;
 
     int qtdAgendamentos = 0;
+    int qtdAtivos = 0;
+    int qtdConcluidos = 0;
+    int qtdCancelamentos = 0;
+
     int qtdPagos = 0;
     int qtdPendentes = 0;
     int qtdPixAguardando = 0;
     int qtdLocalPendente = 0;
-    int qtdCancelamentos = 0;
 
     final Map<String, int> qtdPorServico = {};
     final Map<String, double> valorPorServico = {};
     final Map<String, int> qtdPorHorario = {};
     final Map<String, int> qtdPorPagamento = {};
+    final Map<String, int> qtdPorStatusAtendimento = {};
 
     for (final doc in agendamentosSnapshot.docs) {
       final dados = doc.data();
+
+      final data = (dados['data'] ?? '').toString();
+
+      if (!_dataDentroDoPeriodo(data)) {
+        continue;
+      }
 
       final servico = (dados['servico'] ?? 'Serviço').toString();
       final horario = (dados['horario'] ?? 'Sem horário').toString();
@@ -81,12 +190,29 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
       final statusPagamento =
           (dados['statusPagamento'] ?? 'Pendente').toString();
 
+      final statusAgendamento =
+          (dados['statusAgendamento'] ?? 'ativo').toString();
+
+      qtdPorStatusAtendimento[statusAgendamento] =
+          (qtdPorStatusAtendimento[statusAgendamento] ?? 0) + 1;
+
+      if (statusAgendamento == 'cancelado') {
+        qtdCancelamentos++;
+        continue;
+      }
+
       final valor = dados['valor'] is num
           ? (dados['valor'] as num).toDouble()
           : _agendamentoService.valorServico(servico);
 
       qtdAgendamentos++;
       totalPrevisto += valor;
+
+      if (statusAgendamento == 'concluido') {
+        qtdConcluidos++;
+      } else {
+        qtdAtivos++;
+      }
 
       qtdPorServico[servico] = (qtdPorServico[servico] ?? 0) + 1;
       valorPorServico[servico] = (valorPorServico[servico] ?? 0) + valor;
@@ -113,38 +239,38 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
       }
     }
 
-    for (final doc in notificacoesSnapshot.docs) {
-      final dados = doc.data();
-
-      if ((dados['tipo'] ?? '').toString() == 'cancelamento') {
-        qtdCancelamentos++;
-      }
-    }
-
     final ticketMedio =
         qtdAgendamentos == 0 ? 0.0 : totalPrevisto / qtdAgendamentos;
 
     return {
+      'periodo': _nomePeriodo(_periodoSelecionado),
+      'descricaoPeriodo': _descricaoPeriodo(),
       'totalPrevisto': totalPrevisto,
       'totalRecebido': totalRecebido,
       'totalPendente': totalPendente,
       'totalPixAguardando': totalPixAguardando,
       'totalLocalPendente': totalLocalPendente,
       'qtdAgendamentos': qtdAgendamentos,
+      'qtdAtivos': qtdAtivos,
+      'qtdConcluidos': qtdConcluidos,
+      'qtdCancelamentos': qtdCancelamentos,
       'qtdPagos': qtdPagos,
       'qtdPendentes': qtdPendentes,
       'qtdPixAguardando': qtdPixAguardando,
       'qtdLocalPendente': qtdLocalPendente,
-      'qtdCancelamentos': qtdCancelamentos,
       'ticketMedio': ticketMedio,
       'qtdPorServico': qtdPorServico,
       'valorPorServico': valorPorServico,
       'qtdPorHorario': qtdPorHorario,
       'qtdPorPagamento': qtdPorPagamento,
+      'qtdPorStatusAtendimento': qtdPorStatusAtendimento,
     };
   }
 
   String _montarResumoParaIa(Map<String, dynamic> resumo) {
+    final periodo = resumo['periodo'] as String;
+    final descricaoPeriodo = resumo['descricaoPeriodo'] as String;
+
     final totalPrevisto = resumo['totalPrevisto'] as double;
     final totalRecebido = resumo['totalRecebido'] as double;
     final totalPendente = resumo['totalPendente'] as double;
@@ -152,31 +278,44 @@ class _RelatorioGerencialPageState extends State<RelatorioGerencialPage> {
     final totalLocalPendente = resumo['totalLocalPendente'] as double;
 
     final qtdAgendamentos = resumo['qtdAgendamentos'] as int;
+    final qtdAtivos = resumo['qtdAtivos'] as int;
+    final qtdConcluidos = resumo['qtdConcluidos'] as int;
+    final qtdCancelamentos = resumo['qtdCancelamentos'] as int;
+
     final qtdPagos = resumo['qtdPagos'] as int;
     final qtdPendentes = resumo['qtdPendentes'] as int;
     final qtdPixAguardando = resumo['qtdPixAguardando'] as int;
     final qtdLocalPendente = resumo['qtdLocalPendente'] as int;
-    final qtdCancelamentos = resumo['qtdCancelamentos'] as int;
     final ticketMedio = resumo['ticketMedio'] as double;
 
-    final qtdPorServico = resumo['qtdPorServico'] as Map<String, int>;
-    final valorPorServico = resumo['valorPorServico'] as Map<String, double>;
-    final qtdPorHorario = resumo['qtdPorHorario'] as Map<String, int>;
-    final qtdPorPagamento = resumo['qtdPorPagamento'] as Map<String, int>;
+    final qtdPorServico =
+        Map<String, int>.from(resumo['qtdPorServico'] as Map);
+    final valorPorServico =
+        Map<String, double>.from(resumo['valorPorServico'] as Map);
+    final qtdPorHorario =
+        Map<String, int>.from(resumo['qtdPorHorario'] as Map);
+    final qtdPorPagamento =
+        Map<String, int>.from(resumo['qtdPorPagamento'] as Map);
 
     return '''
+Período selecionado: $periodo
+Descrição do período: $descricaoPeriodo
+
 Faturamento previsto: ${_formatarDinheiro(totalPrevisto)}
 Faturamento recebido: ${_formatarDinheiro(totalRecebido)}
 Faturamento pendente: ${_formatarDinheiro(totalPendente)}
 Pix aguardando confirmação: ${_formatarDinheiro(totalPixAguardando)}
 Pagamento no local pendente: ${_formatarDinheiro(totalLocalPendente)}
 
-Quantidade de agendamentos ativos: $qtdAgendamentos
+Quantidade de agendamentos considerados: $qtdAgendamentos
+Atendimentos ativos: $qtdAtivos
+Atendimentos concluídos: $qtdConcluidos
+Cancelamentos registrados: $qtdCancelamentos
+
 Pagamentos confirmados: $qtdPagos
 Pagamentos pendentes: $qtdPendentes
 Pix aguardando confirmação: $qtdPixAguardando
 Pagamentos no local pendentes: $qtdLocalPendente
-Cancelamentos registrados: $qtdCancelamentos
 Ticket médio previsto: ${_formatarDinheiro(ticketMedio)}
 
 Quantidade por serviço:
@@ -218,6 +357,62 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
       _analiseIa = null;
       _futureResumo = _carregarResumoGerencial();
     });
+  }
+
+  Widget _filtroPeriodos() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2C2C2C),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF3C3C3C)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Período do relatório',
+            style: TextStyle(
+              color: Color(0xFFD4A853),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: PeriodoRelatorio.values.map((periodo) {
+                final selecionado = _periodoSelecionado == periodo;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    selected: selecionado,
+                    label: Text(_nomePeriodo(periodo)),
+                    selectedColor: const Color(0xFFD4A853),
+                    backgroundColor: const Color(0xFF1A1A1A),
+                    labelStyle: TextStyle(
+                      color: selecionado ? Colors.black : Colors.white70,
+                      fontWeight:
+                          selecionado ? FontWeight.bold : FontWeight.normal,
+                    ),
+                    side: BorderSide(
+                      color: selecionado
+                          ? const Color(0xFFD4A853)
+                          : const Color(0xFF3C3C3C),
+                    ),
+                    onSelected: (_) => _trocarPeriodo(periodo),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _cardValor({
@@ -363,12 +558,45 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
     final ticketMedio = resumo['ticketMedio'] as double;
 
     final qtdAgendamentos = resumo['qtdAgendamentos'] as int;
+    final qtdAtivos = resumo['qtdAtivos'] as int;
+    final qtdConcluidos = resumo['qtdConcluidos'] as int;
+    final qtdCancelamentos = resumo['qtdCancelamentos'] as int;
     final qtdPagos = resumo['qtdPagos'] as int;
     final qtdPendentes = resumo['qtdPendentes'] as int;
-    final qtdCancelamentos = resumo['qtdCancelamentos'] as int;
 
     return Column(
       children: [
+        Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2C2C2C),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD4A853)),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Resumo do período',
+                style: TextStyle(
+                  color: Color(0xFFD4A853),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                resumo['descricaoPeriodo'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+        ),
         _cardValor(
           titulo: 'Faturamento previsto',
           valor: _formatarDinheiro(totalPrevisto),
@@ -403,8 +631,20 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
           child: Column(
             children: [
               _linhaIndicador(
-                'Agendamentos ativos',
+                'Agendamentos considerados',
                 qtdAgendamentos.toString(),
+              ),
+              _linhaIndicador(
+                'Atendimentos ativos',
+                qtdAtivos.toString(),
+              ),
+              _linhaIndicador(
+                'Atendimentos concluídos',
+                qtdConcluidos.toString(),
+              ),
+              _linhaIndicador(
+                'Cancelamentos registrados',
+                qtdCancelamentos.toString(),
               ),
               _linhaIndicador(
                 'Pagamentos confirmados',
@@ -413,10 +653,6 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
               _linhaIndicador(
                 'Pagamentos pendentes',
                 qtdPendentes.toString(),
-              ),
-              _linhaIndicador(
-                'Cancelamentos registrados',
-                qtdCancelamentos.toString(),
               ),
               _linhaIndicador(
                 'Ticket médio previsto',
@@ -448,6 +684,14 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
               color: Color(0xFFD4A853),
               fontSize: 18,
               fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'A IA interpreta os dados do período selecionado e gera sugestões para o dono.',
+            style: TextStyle(
+              color: Colors.white54,
+              fontSize: 13,
             ),
           ),
           const SizedBox(height: 12),
@@ -497,15 +741,22 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
   }
 
   Widget _conteudo(Map<String, dynamic> resumo) {
-    final valorPorServico = resumo['valorPorServico'] as Map<String, double>;
-    final qtdPorServico = resumo['qtdPorServico'] as Map<String, int>;
-    final qtdPorHorario = resumo['qtdPorHorario'] as Map<String, int>;
-    final qtdPorPagamento = resumo['qtdPorPagamento'] as Map<String, int>;
+    final valorPorServico =
+        Map<String, double>.from(resumo['valorPorServico'] as Map);
+    final qtdPorServico =
+        Map<String, int>.from(resumo['qtdPorServico'] as Map);
+    final qtdPorHorario =
+        Map<String, int>.from(resumo['qtdPorHorario'] as Map);
+    final qtdPorPagamento =
+        Map<String, int>.from(resumo['qtdPorPagamento'] as Map);
+    final qtdPorStatusAtendimento =
+        Map<String, int>.from(resumo['qtdPorStatusAtendimento'] as Map);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
+          _filtroPeriodos(),
           _cardResumoNumerico(resumo),
           _cardBase(
             titulo: 'Faturamento por serviço',
@@ -522,6 +773,10 @@ ${qtdPorPagamento.entries.map((e) => '- ${e.key}: ${e.value}').join('\n')}
           _cardBase(
             titulo: 'Formas de pagamento',
             child: _listaQuantidades(qtdPorPagamento),
+          ),
+          _cardBase(
+            titulo: 'Status dos atendimentos',
+            child: _listaQuantidades(qtdPorStatusAtendimento),
           ),
           _cardAnaliseIa(resumo),
         ],

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:google_sign_in/google_sign_in.dart';
 import '../services/agendamento_service.dart';
 import '../services/status_service.dart';
 import 'agendamento_page.dart';
@@ -41,6 +41,10 @@ class HomePage extends StatelessWidget {
             tooltip: 'Sair',
             onPressed: () async {
               await FirebaseAuth.instance.signOut();
+
+              try {
+                await GoogleSignIn.instance.signOut();
+              } catch (_) {}
 
               if (!context.mounted) return;
 
