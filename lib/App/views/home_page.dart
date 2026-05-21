@@ -197,7 +197,7 @@ class HomePage extends StatelessWidget {
         const SizedBox(height: 14),
 
         SizedBox(
-          height: 112,
+          height: 122,
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: statusService.buscarStatusAtivos(),
             builder: (context, snapshot) {
@@ -232,24 +232,32 @@ class HomePage extends StatelessWidget {
                 );
               }
 
+              final statusList = docs.map((doc) {
+                final dados = doc.data();
+
+                return {
+                  'statusId': doc.id,
+                  'titulo': (dados['titulo'] ?? 'Status').toString(),
+                  'legenda': (dados['legenda'] ?? '').toString(),
+                  'imagemAsset': (dados['imagemAsset'] ?? 'assets/logo.png')
+                      .toString(),
+                };
+              }).toList();
+
               return ListView(
                 scrollDirection: Axis.horizontal,
                 children: [
                   if (ehDono) _botaoAdicionarStatus(context),
-                  ...docs.map((doc) {
-                    final dados = doc.data();
-
-                    final titulo = dados['titulo'] ?? 'Status';
-                    final legenda = dados['legenda'] ?? '';
-                    final imagemAsset =
-                        dados['imagemAsset'] ?? 'assets/logo.png';
+                  ...statusList.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final item = entry.value;
 
                     return _statusItem(
                       context: context,
-                      statusId: doc.id,
-                      titulo: titulo,
-                      legenda: legenda,
-                      imagemAsset: imagemAsset,
+                      statusList: statusList,
+                      initialIndex: index,
+                      titulo: item['titulo'] ?? 'Status',
+                      imagemAsset: item['imagemAsset'] ?? 'assets/logo.png',
                       podeExcluir: ehDono,
                     );
                   }),
@@ -299,9 +307,9 @@ class HomePage extends StatelessWidget {
 
   Widget _statusItem({
     required BuildContext context,
-    required String statusId,
+    required List<Map<String, String>> statusList,
+    required int initialIndex,
     required String titulo,
-    required String legenda,
     required String imagemAsset,
     required bool podeExcluir,
   }) {
@@ -311,23 +319,21 @@ class HomePage extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (_) => VerStatusPage(
-              statusId: statusId,
-              titulo: titulo,
-              legenda: legenda,
-              imagemAsset: imagemAsset,
+              statusList: statusList,
+              initialIndex: initialIndex,
               podeExcluir: podeExcluir,
             ),
           ),
         );
       },
       child: Container(
-        width: 86,
+        width: 92,
         margin: const EdgeInsets.only(right: 14),
         child: Column(
           children: [
             Container(
-              width: 74,
-              height: 74,
+              width: 82,
+              height: 82,
               padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
