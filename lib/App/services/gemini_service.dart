@@ -1,5 +1,5 @@
 import 'dart:typed_data';
-
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 
 class GeminiService {
@@ -28,7 +28,8 @@ class GeminiService {
         ),
       );
 
-      final prompt = '''
+      final prompt =
+          '''
 Você é um consultor de cortes de cabelo de uma barbearia.
 
 Analise a imagem enviada e gere uma sugestão útil para o cliente escolher um corte de cabelo.
@@ -76,8 +77,20 @@ Resumo final:
       final content = [
         Content.multi([TextPart(prompt), DataPart(mimeType, imagemBytes)]),
       ];
+      final stopwatch = Stopwatch()..start();
 
       final response = await model.generateContent(content);
+
+      stopwatch.stop();
+
+      final uso = response.usageMetadata;
+
+      debugPrint('===== CHAMADA GEMINI - CONSULTOR DE CORTE =====');
+      debugPrint('Prompt tokens: ${uso?.promptTokenCount}');
+      debugPrint('Resposta tokens: ${uso?.candidatesTokenCount}');
+      debugPrint('Total tokens: ${uso?.totalTokenCount}');
+      debugPrint('Tempo de resposta: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('================================================');
 
       final texto = response.text;
 
@@ -92,26 +105,28 @@ Resumo final:
           'Verifique se a chave da Gemini API está correta, se a internet está funcionando e tente novamente.';
     }
   }
+
   Future<String> gerarRelatorioGerencial({
-  required String resumoGerencial,
-}) async {
-  if (_apiKey.isEmpty) {
-    return 'A chave da Gemini API não foi configurada.\n\n'
-        'Rode o app usando:\n'
-        'flutter run --dart-define=GEMINI_API_KEY=SUA_CHAVE_AQUI';
-  }
+    required String resumoGerencial,
+  }) async {
+    if (_apiKey.isEmpty) {
+      return 'A chave da Gemini API não foi configurada.\n\n'
+          'Rode o app usando:\n'
+          'flutter run --dart-define=GEMINI_API_KEY=SUA_CHAVE_AQUI';
+    }
 
-  try {
-    final model = GenerativeModel(
-      model: _modelo,
-      apiKey: _apiKey,
-      generationConfig: GenerationConfig(
-        temperature: 0.5,
-        maxOutputTokens: 1400,
-      ),
-    );
+    try {
+      final model = GenerativeModel(
+        model: _modelo,
+        apiKey: _apiKey,
+        generationConfig: GenerationConfig(
+          temperature: 0.5,
+          maxOutputTokens: 1400,
+        ),
+      );
 
-    final prompt = '''
+      final prompt =
+          '''
 Você é um analista gerencial de uma barbearia.
 
 Com base nos dados abaixo, gere um relatório técnico, simples e útil para o dono da barbearia.
@@ -155,20 +170,31 @@ Conclusão:
 [Resumo final curto.]
 ''';
 
-    final response = await model.generateContent([
-      Content.text(prompt),
-    ]);
+      final stopwatch = Stopwatch()..start();
 
-    final texto = response.text;
+      final response = await model.generateContent([Content.text(prompt)]);
 
-    if (texto == null || texto.trim().isEmpty) {
-      return 'A IA não conseguiu gerar o relatório gerencial.';
+      stopwatch.stop();
+
+      final uso = response.usageMetadata;
+
+      debugPrint('===== CHAMADA GEMINI - RELATORIO GERENCIAL =====');
+      debugPrint('Prompt tokens: ${uso?.promptTokenCount}');
+      debugPrint('Resposta tokens: ${uso?.candidatesTokenCount}');
+      debugPrint('Total tokens: ${uso?.totalTokenCount}');
+      debugPrint('Tempo de resposta: ${stopwatch.elapsedMilliseconds} ms');
+      debugPrint('================================================');
+
+      final texto = response.text;
+
+      if (texto == null || texto.trim().isEmpty) {
+        return 'A IA não conseguiu gerar o relatório gerencial.';
+      }
+
+      return texto.trim();
+    } catch (e) {
+      return 'Não foi possível gerar o relatório com IA agora.\n\n'
+          'Verifique se a chave da Gemini API está correta, se a internet está funcionando e tente novamente.';
     }
-
-    return texto.trim();
-  } catch (e) {
-    return 'Não foi possível gerar o relatório com IA agora.\n\n'
-        'Verifique se a chave da Gemini API está correta, se a internet está funcionando e tente novamente.';
   }
-}
 }
