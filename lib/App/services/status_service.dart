@@ -10,15 +10,15 @@ class StatusService {
   static const List<Map<String, String>> imagensDisponiveis = [
     {
       'nome': 'Promoção',
-      'asset': 'assets/status/promocao.png',
+      'asset': 'assets/status/promocao.jpg',
     },
     {
       'nome': 'Corte',
-      'asset': 'assets/status/corte.png',
+      'asset': 'assets/status/corte.jpg',
     },
     {
       'nome': 'Aviso',
-      'asset': 'assets/status/aviso.png',
+      'asset': 'assets/status/aviso.jpg',
     },
   ];
 
